@@ -1,1 +1,36 @@
-command: pages deploy .web/build/client --project-name=pesticide-mobile
+name: Build and Deploy Pesticide Static Web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 가져오기
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 라이브러리 설치
+        run: pip install -r requirements.txt
+
+      - name: GitHub Release 데이터 및 로고 변환
+        run: python prepare_data.py
+
+      - name: Reflex 정적 웹 빌드
+        run: |
+          reflex init
+          reflex export --frontend-only --no-zip
+
+      - name: Cloudflare Pages에 배포
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy .web/build/client --project-name=pesticide-mobile
