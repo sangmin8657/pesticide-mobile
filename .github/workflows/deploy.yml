@@ -1,0 +1,1 @@
+command: pages deploy .web/build/client --project-name=pesticide-mobile
