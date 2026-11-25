@@ -12,7 +12,6 @@ def index() -> rx.Component:
                     src="/nier_logo.png",
                     alt="국립환경과학원 로고",
                     class_name="header-logo",
-                    on_error="this.style.display='none'",
                 ),
                 class_name="header-container",
             ),
@@ -118,7 +117,7 @@ def index() -> rx.Component:
                     ),
                     class_name="metric-container",
                 ),
-                # (3) 상세 안전사용지침 카드 (목록에서 항목 터치 시 즉시 표시)
+                # (3) 상세 안전사용지침 카드
                 rx.el.div(
                     rx.el.h2("🔎 검색된 농약 상세 안전사용지침", class_name="section-title"),
                     rx.el.div(
@@ -208,10 +207,10 @@ def index() -> rx.Component:
                                 class_name="form-control",
                             ),
                             rx.el.div(
-                                rx.el.button("500배", type="button", class_name="preset-btn", data_ratio="500"),
-                                rx.el.button("1,000배", type="button", class_name="preset-btn", data_ratio="1000"),
-                                rx.el.button("1,500배", type="button", class_name="preset-btn", data_ratio="1500"),
-                                rx.el.button("2,000배", type="button", class_name="preset-btn", data_ratio="2000"),
+                                rx.el.button("500배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "500"}),
+                                rx.el.button("1,000배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "1000"}),
+                                rx.el.button("1,500배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "1500"}),
+                                rx.el.button("2,000배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "2000"}),
                                 class_name="preset-row",
                             ),
                             class_name="filter-item",
@@ -259,13 +258,11 @@ def index() -> rx.Component:
                         src="/nier_logo.png",
                         alt="국립환경과학원 로고",
                         class_name="footer-agency-logo",
-                        on_error="this.outerHTML='<span class=\"agency-badge\">국립환경과학원</span>'",
                     ),
                     rx.el.img(
                         src="/rda_logo.png",
                         alt="농촌진흥청 로고",
                         class_name="footer-agency-logo",
-                        on_error="this.outerHTML='<span class=\"agency-badge\">농촌진흥청</span>'",
                     ),
                     rx.el.span("농약안전정보센터", class_name="agency-badge"),
                     class_name="footer-logos",
