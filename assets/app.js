@@ -1,7 +1,15 @@
 (function () {
   if (window.__PESTICIDE_APP_BOOTED__) return;
   window.__PESTICIDE_APP_BOOTED__ = true;
-
+[
+    { rel: "manifest", href: "/manifest.json" },
+    { rel: "apple-touch-icon", href: "/app_icon.png" },
+  ].forEach((attrs) => {
+    const link = document.createElement("link");
+    Object.assign(link, attrs);
+    document.head.appendChild(link);
+  });
+  
   let allData = [];
   let filteredData = [];
   let isFetching = false;
