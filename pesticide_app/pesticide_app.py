@@ -364,6 +364,13 @@ def index() -> rx.Component:
 app = rx.App(
     enable_state=False,
     stylesheets=["/style.css"],
-    head_components=[rx.script(src="/app.js")],
+    head_components=[
+        rx.el.link(rel="manifest", href="/manifest.json"),
+        rx.el.link(rel="apple-touch-icon", href="/nier_logo.png"),
+        rx.el.meta(name="apple-mobile-web-app-capable", content="yes"),
+        rx.el.meta(name="mobile-web-app-capable", content="yes"),
+        rx.el.meta(name="theme-color", content="#1b4332"),
+        rx.script(src="/app.js"),
+    ],
 )
 app.add_page(index, title="골프장 농약 안전사용 도우미")
