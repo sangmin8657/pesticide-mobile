@@ -95,7 +95,7 @@ body, .page-bg {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
@@ -109,7 +109,7 @@ body, .page-bg {
 .sub-caption {
   font-size: 13px;
   color: #64748b;
-  margin: 4px 0 14px;
+  margin: 0 0 12px;
 }
 
 .reset-btn {
@@ -141,8 +141,19 @@ body, .page-bg {
   gap: 10px;
 }
 
+.calc-search-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 10px;
+  padding: 12px;
+  background-color: #f8faf9;
+  border: 1px solid #d1fae5;
+  border-radius: 10px;
+}
+
 @media (max-width: 720px) {
-  .filter-grid {
+  .filter-grid,
+  .calc-search-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -257,7 +268,7 @@ body, .page-bg {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  max-height: 250px;
+  max-height: 260px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background-color: #ffffff;
@@ -280,10 +291,11 @@ body, .page-bg {
 
 .combo-option {
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: 14.5px;
   color: #1e293b;
   border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
+  line-height: 1.4;
 }
 
 .combo-option:last-child {
@@ -295,6 +307,14 @@ body, .page-bg {
   background-color: #ecfdf5;
   color: #1b4332;
   font-weight: 700;
+}
+
+.combo-subtext {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748b;
+  margin-top: 2px;
 }
 
 .combo-highlight {
@@ -310,6 +330,40 @@ body, .page-bg {
   font-size: 13.5px;
   color: #94a3b8;
   text-align: center;
+}
+
+/* 계산기 내 선택된 농약 기준 정보 박스 */
+.calc-selected-box {
+  margin-top: 10px;
+  padding: 12px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #1e3a8a;
+  line-height: 1.55;
+}
+
+.calc-range-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.calc-range-btn {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background-color: #ffffff;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.calc-range-btn:hover {
+  background-color: #dbeafe;
 }
 
 /* 2. 모바일 가로 1줄 요약지표 */
@@ -348,7 +402,63 @@ body, .page-bg {
   white-space: nowrap;
 }
 
-/* 상세 안전사용지침 카드 */
+/* 상세 안전사용지침 팝업 모달 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  z-index: 2000;
+}
+
+.modal-dialog {
+  width: 100%;
+  max-width: 720px;
+  max-height: 88vh;
+  background-color: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  background-color: #1b4332;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.modal-header-title {
+  font-size: 15.5px;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  padding: 5px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1b4332;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 14px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 상세 안전사용지침 카드 (모달 내부) */
 .detail-card {
   background-color: #f8faf9;
   border: 1.5px solid #2d6a4f;
@@ -400,6 +510,22 @@ body, .page-bg {
   color: #1e3a8a;
 }
 
+.detail-calc-action {
+  margin-top: 12px;
+}
+
+.detail-calc-btn {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  background-color: #1d4ed8;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 /* 검색 결과 모바일 카드 리스트 */
 .info-banner {
   padding: 10px 12px;
@@ -423,11 +549,13 @@ body, .page-bg {
   padding: 12px;
   background-color: #ffffff;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background-color 0.15s;
 }
 
-.pesticide-item-card:hover {
+.pesticide-item-card:hover,
+.pesticide-item-card:active {
   border-color: #2d6a4f;
+  background-color: #f8faf9;
 }
 
 .item-card-top {
@@ -444,6 +572,13 @@ body, .page-bg {
   color: #0f172a;
 }
 
+.item-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .item-badge {
   font-size: 11px;
   font-weight: 600;
@@ -451,6 +586,13 @@ body, .page-bg {
   border-radius: 999px;
   background-color: #ecfdf5;
   color: #065f46;
+  white-space: nowrap;
+}
+
+.item-detail-hint {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d6a4f;
   white-space: nowrap;
 }
 
