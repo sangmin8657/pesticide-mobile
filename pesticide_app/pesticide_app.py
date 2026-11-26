@@ -2,7 +2,7 @@ import reflex as rx
 
 
 def searchable_select(prefix: str, label_text: str, placeholder_text: str) -> rx.Component:
-    """검색어 입력 시 일치하는 목록이 자동으로 뜨는 모바일 맞춤형 선택 컴포넌트"""
+    """목록 선택(▼)과 검색어 자동완성을 동시에 지원하는 콤보박스"""
     return rx.el.div(
         rx.el.label(label_text, html_for=f"{prefix}-input", class_name="field-label"),
         rx.el.div(
@@ -21,6 +21,13 @@ def searchable_select(prefix: str, label_text: str, placeholder_text: str) -> rx
                 class_name="combo-clear-btn",
                 style={"display": "none"},
             ),
+            rx.el.button(
+                "▼",
+                id=f"{prefix}-toggle",
+                type="button",
+                title="전체 목록 열기",
+                class_name="combo-toggle-btn",
+            ),
             rx.el.div(
                 id=f"{prefix}-dropdown",
                 class_name="combo-dropdown",
@@ -35,7 +42,6 @@ def searchable_select(prefix: str, label_text: str, placeholder_text: str) -> rx
 
 def index() -> rx.Component:
     return rx.box(
-        rx.el.link(rel="stylesheet", href="/style.css"),
         rx.el.div(
             # 1. 메인 헤더 영역
             rx.el.div(
@@ -67,7 +73,7 @@ def index() -> rx.Component:
             # TAB 1: 농약 검색
             # ==========================================
             rx.el.div(
-                # (1) 상단 검색 필터 박스 (검색형 자동완성 적용)
+                # (1) 상단 검색 필터 박스
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2("🔍 농약 검색 조건", class_name="section-title"),
@@ -80,9 +86,9 @@ def index() -> rx.Component:
                         class_name="section-header-row",
                     ),
                     rx.el.div(
-                        searchable_select("use", "1. 용도 선택", "전체 (터치 또는 용도 입력)"),
-                        searchable_select("crop", "2. 작물 선택", "전체 (예: 잔디 입력)"),
-                        searchable_select("pest", "3. 적용 병해충 선택", "전체 (병해충명 입력)"),
+                        searchable_select("use", "1. 용도 선택", "전체 (선택 또는 입력)"),
+                        searchable_select("crop", "2. 작물 선택", "전체 (선택 또는 예: 잔디 입력)"),
+                        searchable_select("pest", "3. 적용 병해충 선택", "전체 (선택 또는 병해충 입력)"),
                         class_name="filter-grid",
                     ),
                     rx.el.div(
@@ -91,11 +97,20 @@ def index() -> rx.Component:
                             html_for="keyword-input",
                             class_name="field-label",
                         ),
-                        rx.el.input(
-                            id="keyword-input",
-                            type="search",
-                            placeholder="검색어를 입력하세요 (예: 가가방, 수화제, 가스가마이신 등)",
-                            class_name="form-control",
+                        rx.el.div(
+                            rx.el.input(
+                                id="keyword-input",
+                                type="search",
+                                placeholder="예: 가가방, 수화제, 가스가마이신 등",
+                                class_name="form-control keyword-input-field",
+                            ),
+                            rx.el.button(
+                                "🔍 검색",
+                                id="search-submit-btn",
+                                type="button",
+                                class_name="search-submit-btn",
+                            ),
+                            class_name="keyword-input-row",
                         ),
                         class_name="keyword-box",
                     ),
@@ -123,6 +138,7 @@ def index() -> rx.Component:
                         rx.el.div("-", id="metric-brands", class_name="metric-value"),
                         class_name="metric-box",
                     ),
+                    id="metric-section",
                     class_name="metric-container",
                 ),
                 # (3) 검색 결과 목록 & CSV 다운로드 (상단 배치)
@@ -197,9 +213,10 @@ def index() -> rx.Component:
                             rx.el.input(
                                 id="water-input",
                                 type="number",
-                                step="0.5",
-                                min="0.1",
-                                value="20",
+                                step="any",
+                                min="0",
+                                default_value="20",
+                                input_mode="decimal",
                                 class_name="form-control",
                             ),
                             class_name="filter-item",
@@ -209,9 +226,10 @@ def index() -> rx.Component:
                             rx.el.input(
                                 id="dilution-input",
                                 type="number",
-                                step="100",
+                                step="any",
                                 min="1",
-                                value="1000",
+                                default_value="1000",
+                                input_mode="numeric",
                                 class_name="form-control",
                             ),
                             rx.el.div(
@@ -295,10 +313,13 @@ def index() -> rx.Component:
             ),
             class_name="app-wrapper",
         ),
-        rx.script(src="/app.js"),
         class_name="page-bg",
     )
 
 
-app = rx.App(enable_state=False)
+app = rx.App(
+    enable_state=False,
+    stylesheets=["/style.css"],
+    head_components=[rx.script(src="/app.js")],
+)
 app.add_page(index, title="골프장 농약 안전사용 도우미")
