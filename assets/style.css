@@ -141,19 +141,16 @@ body, .page-bg {
   gap: 10px;
 }
 
-.calc-search-grid {
+.calc-input-grid {
   display: grid;
-  grid-template-columns: 1fr 1.6fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  padding: 12px;
-  background-color: #f8faf9;
-  border: 1px solid #d1fae5;
-  border-radius: 10px;
+  margin-top: 12px;
 }
 
 @media (max-width: 720px) {
   .filter-grid,
-  .calc-search-grid {
+  .calc-input-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -332,7 +329,28 @@ body, .page-bg {
   text-align: center;
 }
 
-/* 계산기 내 선택된 농약 기준 정보 박스 */
+/* 계산기 1단계 검색 패널 & 고정/범위 입력 스타일 */
+.calc-search-panel {
+  padding: 12px;
+  background-color: #f8faf9;
+  border: 1px solid #d1fae5;
+  border-radius: 10px;
+}
+
+.calc-step-heading {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1b4332;
+  margin-bottom: 10px;
+}
+
+.calc-match-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2d6a4f;
+}
+
 .calc-selected-box {
   margin-top: 10px;
   padding: 12px;
@@ -364,6 +382,95 @@ body, .page-bg {
 
 .calc-range-btn:hover {
   background-color: #dbeafe;
+}
+
+.water-input-group {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.water-unit-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.unit-fixed-badge {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1b4332;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.locked-ratio-input {
+  flex: 1;
+  min-width: 0;
+  background-color: #f1f5f9;
+  color: #1d4ed8;
+  font-weight: 700;
+  border-color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.locked-ratio-input:focus {
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.editable-ratio-input {
+  flex: 1;
+  min-width: 0;
+  background-color: #ffffff;
+  color: #1d4ed8;
+  font-weight: 700;
+  border: 1.5px solid #2d6a4f;
+  cursor: text;
+}
+
+.lock-fixed-badge {
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #475569;
+  background-color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.editable-ratio-badge {
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #166534;
+  background-color: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dilution-range-hint {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.dilution-range-hint.error {
+  color: #dc2626;
 }
 
 /* 2. 모바일 가로 1줄 요약지표 */
@@ -602,37 +709,7 @@ body, .page-bg {
   line-height: 1.55;
 }
 
-/* 희석배수 계산기 */
-.radio-group {
-  display: flex;
-  gap: 14px;
-  padding: 8px 0;
-  font-size: 14px;
-}
-
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.preset-row {
-  display: flex;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.preset-btn {
-  flex: 1;
-  padding: 6px 4px;
-  font-size: 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background-color: #f8fafc;
-  cursor: pointer;
-}
-
+/* 희석배수 계산기 결과 영역 */
 .calc-result-panel {
   margin-top: 16px;
   padding-top: 14px;
@@ -666,7 +743,7 @@ body, .page-bg {
 }
 
 .calc-box-value {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: #1b4332;
   margin: 4px 0;
