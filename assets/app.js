@@ -275,10 +275,27 @@
       panelSearch.style.display = "none";
     });
 
-    // 데이터 로딩
+    // 데이터 로딩 (분할된 JSON 병렬 로드)
     try {
-      const res = await fetch("/pesticide_data.json");
-      allData = await res.json();
+      const metaRes = await fetch("/pesticide_meta.json");
+      const meta = await metaRes.json();
+      const cols = meta.columns;
+
+      const partArrays = await Promise.all(
+        meta.chunks.map((file) => fetch("/" + file).then((r) => r.json()))
+      );
+
+      allData = [];
+      for (const part of partArrays) {
+        for (const arr of part) {
+          const obj = {};
+          for (let i = 0; i < cols.length; i++) {
+            obj[cols[i]] = arr[i];
+          }
+          allData.push(obj);
+        }
+      }
+
       populateSelect(useSelect, getUniqueOptions(allData, "용도"));
       populateSelect(cropSelect, getUniqueOptions(allData, "작물명"));
       populateSelect(pestSelect, getUniqueOptions(allData, "적용병해충"));
