@@ -73,7 +73,6 @@ def index() -> rx.Component:
             # TAB 1: 농약 검색
             # ==========================================
             rx.el.div(
-                # (1) 상단 검색 필터 박스
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2("🔍 농약 검색 조건", class_name="section-title"),
@@ -116,7 +115,6 @@ def index() -> rx.Component:
                     ),
                     class_name="card-box",
                 ),
-                # (2) 검색 결과 요약 지표 (모바일 가로 1줄 4칸)
                 rx.el.div(
                     rx.el.div(
                         rx.el.div("검색 결과", class_name="metric-label"),
@@ -141,7 +139,6 @@ def index() -> rx.Component:
                     id="metric-section",
                     class_name="metric-container",
                 ),
-                # (3) 검색 결과 목록 & CSV 다운로드 (항목 터치 시 즉시 상세 팝업 오픈)
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2("📋 검색 결과 목록", class_name="section-title"),
@@ -164,7 +161,7 @@ def index() -> rx.Component:
                 id="tab-panel-search",
             ),
             # ==========================================
-            # TAB 2: 희석배수 계산기 ('농약 검색'과 동일 순서 · L 고정 · 범위 등록 농약만 직접 입력 허용)
+            # TAB 2: 희석배수 계산기
             # ==========================================
             rx.el.div(
                 rx.el.div(
@@ -182,7 +179,6 @@ def index() -> rx.Component:
                         "농약 검색과 동일한 순서로 조건을 좁혀 최종 농약을 선택하세요. 범위로 등록된 농약만 희석배수를 직접 입력할 수 있습니다.",
                         class_name="sub-caption",
                     ),
-                    # [1단계] 농약 검색 및 선택 (농약 검색 탭과 동일 순서: 용도 → 작물 → 병해충 → 상표/품목/성분)
                     rx.el.div(
                         rx.el.div("1단계. 농약 검색 및 최종 선택", class_name="calc-step-heading"),
                         rx.el.div(
@@ -205,13 +201,11 @@ def index() -> rx.Component:
                         ),
                         class_name="calc-search-panel",
                     ),
-                    # 선택된 농약 기준 정보 안내 박스
                     rx.el.div(
                         id="calc-selected-info",
                         class_name="calc-selected-box",
                         style={"display": "none"},
                     ),
-                    # [2단계 & 3단계] 살포할 물의 양(L 고정) 및 적용 희석배수(범위 농약만 입력 허용)
                     rx.el.div(
                         rx.el.div(
                             rx.el.label(
@@ -246,7 +240,6 @@ def index() -> rx.Component:
                                     id="dilution-input",
                                     type="text",
                                     read_only=True,
-                                    tab_index=-1,
                                     placeholder="위에서 농약을 선택하면 자동 입력됩니다",
                                     class_name="form-control locked-ratio-input",
                                 ),
@@ -262,7 +255,6 @@ def index() -> rx.Component:
                         ),
                         class_name="calc-input-grid",
                     ),
-                    # 자동 계산 결과 출력
                     rx.el.div(
                         rx.el.div("💡 자동 계산 결과", class_name="calc-result-title"),
                         rx.el.div(
@@ -296,9 +288,7 @@ def index() -> rx.Component:
                 id="tab-panel-calc",
                 style={"display": "none"},
             ),
-            # ==========================================
             # 4. 화면 최하단 출처 및 기관 표시 푸터
-            # ==========================================
             rx.el.footer(
                 rx.el.div(
                     rx.el.img(
@@ -334,9 +324,7 @@ def index() -> rx.Component:
             ),
             class_name="app-wrapper",
         ),
-        # ==========================================
         # 5. 상세 안전사용지침 즉시 팝업 모달
-        # ==========================================
         rx.el.div(
             rx.el.div(
                 rx.el.div(
@@ -364,12 +352,6 @@ def index() -> rx.Component:
 app = rx.App(
     enable_state=False,
     stylesheets=["/style.css"],
-    head_components=[
-        rx.el.link(rel="manifest", href="/manifest.json"),
-        rx.el.link(rel="apple-touch-icon", href="/app_icon.png"),
-        rx.el.meta(name="apple-mobile-web-app-capable", content="yes"),
-        rx.el.meta(name="mobile-web-app-capable", content="yes"),
-        rx.el.meta(name="theme-color", content="#1b4332"),
-        rx.script(src="/app.js"),
-    ],
+    head_components=[rx.script(src="/app.js")],
 )
+app.add_page(index, title="골프장 농약 안전사용 도우미")
