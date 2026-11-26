@@ -1,4 +1,6 @@
 import io
+import json
+import math
 import os
 import pandas as pd
 import requests
@@ -10,6 +12,8 @@ RDA_LOGO_URL = "https://github.com/sangmin8657/pesticide-app/releases/download/p
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
+
+CHUNK_SIZE = 20000  # 파일당 2만 건씩 분할 (Cloudflare 25MB 제한 방지)
 
 os.makedirs("assets", exist_ok=True)
 
@@ -31,8 +35,32 @@ def build_json_data() -> None:
     df = pd.read_csv(io.StringIO(res.text), dtype=str)
     df.columns = df.columns.str.strip()
     df = df.fillna("-")
-    df.to_json("assets/pesticide_data.json", orient="records", force_ascii=False)
-    print(f"농약 데이터 변환 완료: 총 {len(df):,}건")
+
+    columns = df.columns.tolist()
+    records = df.values.tolist()
+    total_rows = len(records)
+    num_chunks = max(1, math.ceil(total_rows / CHUNK_SIZE))
+
+    chunk_files = []
+    for i in range(num_chunks):
+        chunk = records[i * CHUNK_SIZE : (i + 1) * CHUNK_SIZE]
+        filename = f"pesticide_part_{i}.json"
+        filepath = os.path.join("assets", filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(chunk, f, ensure_ascii=False, separators=(",", ":"))
+        size_mb = os.path.getsize(filepath) / (1024 * 1024)
+        print(f"분할 파일 생성: {filename} ({len(chunk):,}건, {size_mb:.2f} MB)")
+        chunk_files.append(filename)
+
+    meta = {
+        "columns": columns,
+        "chunks": chunk_files,
+        "total": total_rows,
+    }
+    with open("assets/pesticide_meta.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, separators=(",", ":"))
+
+    print(f"농약 데이터 변환 완료: 총 {total_rows:,}건 ({num_chunks}개 파일로 분할)")
 
 
 if __name__ == "__main__":
