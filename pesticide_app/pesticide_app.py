@@ -1,6 +1,38 @@
 import reflex as rx
 
 
+def searchable_select(prefix: str, label_text: str, placeholder_text: str) -> rx.Component:
+    """검색어 입력 시 일치하는 목록이 자동으로 뜨는 모바일 맞춤형 선택 컴포넌트"""
+    return rx.el.div(
+        rx.el.label(label_text, html_for=f"{prefix}-input", class_name="field-label"),
+        rx.el.div(
+            rx.el.input(
+                id=f"{prefix}-input",
+                type="text",
+                placeholder=placeholder_text,
+                auto_complete="off",
+                class_name="form-control combo-input",
+            ),
+            rx.el.button(
+                "×",
+                id=f"{prefix}-clear",
+                type="button",
+                title="전체로 초기화",
+                class_name="combo-clear-btn",
+                style={"display": "none"},
+            ),
+            rx.el.div(
+                id=f"{prefix}-dropdown",
+                class_name="combo-dropdown",
+                style={"display": "none"},
+            ),
+            id=f"{prefix}-wrapper",
+            class_name="combo-wrapper",
+        ),
+        class_name="filter-item",
+    )
+
+
 def index() -> rx.Component:
     return rx.box(
         rx.el.link(rel="stylesheet", href="/style.css"),
@@ -35,7 +67,7 @@ def index() -> rx.Component:
             # TAB 1: 농약 검색
             # ==========================================
             rx.el.div(
-                # (1) 상단 검색 필터 박스
+                # (1) 상단 검색 필터 박스 (검색형 자동완성 적용)
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2("🔍 농약 검색 조건", class_name="section-title"),
@@ -48,33 +80,9 @@ def index() -> rx.Component:
                         class_name="section-header-row",
                     ),
                     rx.el.div(
-                        rx.el.div(
-                            rx.el.label("1. 용도 선택", html_for="use-select", class_name="field-label"),
-                            rx.el.select(
-                                rx.el.option("전체", value="전체"),
-                                id="use-select",
-                                class_name="form-control",
-                            ),
-                            class_name="filter-item",
-                        ),
-                        rx.el.div(
-                            rx.el.label("2. 작물 선택", html_for="crop-select", class_name="field-label"),
-                            rx.el.select(
-                                rx.el.option("전체", value="전체"),
-                                id="crop-select",
-                                class_name="form-control",
-                            ),
-                            class_name="filter-item",
-                        ),
-                        rx.el.div(
-                            rx.el.label("3. 적용 병해충 선택", html_for="pest-select", class_name="field-label"),
-                            rx.el.select(
-                                rx.el.option("전체", value="전체"),
-                                id="pest-select",
-                                class_name="form-control",
-                            ),
-                            class_name="filter-item",
-                        ),
+                        searchable_select("use", "1. 용도 선택", "전체 (터치 또는 용도 입력)"),
+                        searchable_select("crop", "2. 작물 선택", "전체 (예: 잔디 입력)"),
+                        searchable_select("pest", "3. 적용 병해충 선택", "전체 (병해충명 입력)"),
                         class_name="filter-grid",
                     ),
                     rx.el.div(
@@ -117,23 +125,7 @@ def index() -> rx.Component:
                     ),
                     class_name="metric-container",
                 ),
-                # (3) 상세 안전사용지침 카드
-                rx.el.div(
-                    rx.el.h2("🔎 검색된 농약 상세 안전사용지침", class_name="section-title"),
-                    rx.el.div(
-                        rx.el.label(
-                            "상세 지침을 확인할 농약을 선택하거나 아래 목록에서 카드를 터치하세요:",
-                            html_for="detail-select",
-                            class_name="field-label",
-                        ),
-                        rx.el.select(id="detail-select", class_name="form-control"),
-                        style={"marginBottom": "12px"},
-                    ),
-                    rx.el.div(id="detail-card-container"),
-                    id="detail-section",
-                    class_name="card-box",
-                ),
-                # (4) 검색 결과 목록 & CSV 다운로드
+                # (3) 검색 결과 목록 & CSV 다운로드 (상단 배치)
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2("📋 검색 결과 목록", class_name="section-title"),
@@ -147,6 +139,22 @@ def index() -> rx.Component:
                     ),
                     rx.el.div(id="list-notice", class_name="info-banner", style={"display": "none"}),
                     rx.el.div(id="result-list", class_name="result-list"),
+                    class_name="card-box",
+                ),
+                # (4) 상세 안전사용지침 카드 (하단 배치)
+                rx.el.div(
+                    rx.el.h2("🔎 검색된 농약 상세 안전사용지침", class_name="section-title"),
+                    rx.el.div(
+                        rx.el.label(
+                            "위 목록에서 카드를 터치하거나 아래에서 농약을 선택하면 상세 지침이 표시됩니다:",
+                            html_for="detail-select",
+                            class_name="field-label",
+                        ),
+                        rx.el.select(id="detail-select", class_name="form-control"),
+                        style={"marginTop": "8px", "marginBottom": "12px"},
+                    ),
+                    rx.el.div(id="detail-card-container"),
+                    id="detail-section",
                     class_name="card-box",
                 ),
                 id="tab-panel-search",
