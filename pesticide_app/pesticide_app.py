@@ -164,7 +164,7 @@ def index() -> rx.Component:
                 id="tab-panel-search",
             ),
             # ==========================================
-            # TAB 2: 희석배수 계산기 (작물·농약 검색 연동)
+            # TAB 2: 희석배수 계산기 ('농약 검색'과 동일 순서 · L 고정 · 범위 등록 농약만 직접 입력 허용)
             # ==========================================
             rx.el.div(
                 rx.el.div(
@@ -179,114 +179,103 @@ def index() -> rx.Component:
                         class_name="section-header-row",
                     ),
                     rx.el.p(
-                        "적용작물과 농약을 검색해 선택하면 기준 희석배수가 자동 입력됩니다. 살포할 물의 양만 입력하세요.",
+                        "농약 검색과 동일한 순서로 조건을 좁혀 최종 농약을 선택하세요. 범위로 등록된 농약만 희석배수를 직접 입력할 수 있습니다.",
                         class_name="sub-caption",
                     ),
-                    # ① 적용작물 및 농약 검색 선택 영역
+                    # [1단계] 농약 검색 및 선택 (농약 검색 탭과 동일 순서: 용도 → 작물 → 병해충 → 상표/품목/성분)
                     rx.el.div(
-                        searchable_select(
-                            "calc-crop",
-                            "1단계. 적용작물 선택 (선택 또는 검색)",
-                            "전체 작물 (예: 잔디 입력)",
+                        rx.el.div("1단계. 농약 검색 및 최종 선택", class_name="calc-step-heading"),
+                        rx.el.div(
+                            searchable_select("calc-use", "1. 용도 선택", "전체 (선택 또는 입력)"),
+                            searchable_select("calc-crop", "2. 작물 선택", "전체 (선택 또는 예: 잔디 입력)"),
+                            searchable_select("calc-pest", "3. 적용 병해충 선택", "전체 (선택 또는 병해충 입력)"),
+                            class_name="filter-grid",
                         ),
-                        searchable_select(
-                            "calc-pesticide",
-                            "2단계. 농약 선택 (상표명 / 품목명 / 병해충 검색)",
-                            "농약명 또는 병해충명 입력...",
+                        rx.el.div(
+                            searchable_select(
+                                "calc-pesticide",
+                                "4. 최종 농약 선택 (상표명 / 품목명 / 성분명 검색)",
+                                "터치하여 목록에서 선택하거나 농약명·성분명 입력",
+                            ),
+                            rx.el.div(
+                                id="calc-match-count",
+                                class_name="calc-match-hint",
+                            ),
+                            class_name="keyword-box",
                         ),
-                        class_name="calc-search-grid",
+                        class_name="calc-search-panel",
                     ),
-                    # 선택된 농약의 기준 희석배수 안내 박스
+                    # 선택된 농약 기준 정보 안내 박스
                     rx.el.div(
                         id="calc-selected-info",
                         class_name="calc-selected-box",
                         style={"display": "none"},
                     ),
-                    # ② 물의 양 및 희석배수 입력 영역
+                    # [2단계 & 3단계] 살포할 물의 양(L 고정) 및 적용 희석배수(범위 농약만 입력 허용)
                     rx.el.div(
                         rx.el.div(
-                            rx.el.div("3단계. 입력단위 선택", class_name="field-label"),
+                            rx.el.label(
+                                "2단계. 살포할 물의 양 (L 단위 고정)",
+                                html_for="water-input",
+                                class_name="field-label",
+                            ),
                             rx.el.div(
-                                rx.el.label(
-                                    rx.el.input(
-                                        id="unit-radio-l",
-                                        type="radio",
-                                        name="unit-type",
-                                        value="L",
-                                        default_checked=True,
-                                    ),
-                                    " 리터 (L)",
-                                    class_name="radio-label",
+                                rx.el.input(
+                                    id="water-input",
+                                    type="number",
+                                    step="any",
+                                    min="0",
+                                    default_value="20",
+                                    input_mode="decimal",
+                                    class_name="form-control water-unit-input",
                                 ),
-                                rx.el.label(
-                                    rx.el.input(
-                                        id="unit-radio-mal",
-                                        type="radio",
-                                        name="unit-type",
-                                        value="MAL",
-                                    ),
-                                    " 말 (1말 = 20L)",
-                                    class_name="radio-label",
-                                ),
-                                class_name="radio-group",
+                                rx.el.span("L (리터)", class_name="unit-fixed-badge"),
+                                class_name="water-input-group",
                             ),
                             class_name="filter-item",
                         ),
                         rx.el.div(
                             rx.el.label(
-                                "4단계. 살포할 물의 양 (L)",
-                                id="water-input-label",
-                                html_for="water-input",
+                                "3단계. 적용 희석배수 (범위 등록 농약만 입력 가능)",
+                                id="dilution-input-label",
+                                html_for="dilution-input",
                                 class_name="field-label",
                             ),
-                            rx.el.input(
-                                id="water-input",
-                                type="number",
-                                step="any",
-                                min="0",
-                                default_value="20",
-                                input_mode="decimal",
-                                class_name="form-control",
-                            ),
-                            class_name="filter-item",
-                        ),
-                        rx.el.div(
-                            rx.el.label("5단계. 적용 희석배수 (배)", html_for="dilution-input", class_name="field-label"),
-                            rx.el.input(
-                                id="dilution-input",
-                                type="number",
-                                step="any",
-                                min="1",
-                                default_value="1000",
-                                input_mode="numeric",
-                                class_name="form-control",
+                            rx.el.div(
+                                rx.el.input(
+                                    id="dilution-input",
+                                    type="text",
+                                    read_only=True,
+                                    tab_index=-1,
+                                    placeholder="위에서 농약을 선택하면 자동 입력됩니다",
+                                    class_name="form-control locked-ratio-input",
+                                ),
+                                rx.el.span("🔒 고정", id="dilution-lock-badge", class_name="lock-fixed-badge"),
+                                class_name="water-input-group",
                             ),
                             rx.el.div(
-                                rx.el.button("500배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "500"}),
-                                rx.el.button("1,000배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "1000"}),
-                                rx.el.button("1,500배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "1500"}),
-                                rx.el.button("2,000배", type="button", class_name="preset-btn", custom_attrs={"data-ratio": "2000"}),
-                                class_name="preset-row",
+                                id="dilution-range-hint",
+                                class_name="dilution-range-hint",
+                                style={"display": "none"},
                             ),
                             class_name="filter-item",
                         ),
-                        class_name="filter-grid",
-                        style={"marginTop": "12px"},
+                        class_name="calc-input-grid",
                     ),
-                    # ③ 자동 계산 결과 출력
+                    # 자동 계산 결과 출력
                     rx.el.div(
                         rx.el.div("💡 자동 계산 결과", class_name="calc-result-title"),
                         rx.el.div(
                             rx.el.div(
-                                rx.el.div("필요한 물의 총량", class_name="calc-box-label"),
+                                rx.el.div("살포할 물의 양", class_name="calc-box-label"),
                                 rx.el.div("20.0 L", id="calc-water-main", class_name="calc-box-value"),
-                                rx.el.div("1.0 말", id="calc-water-sub", class_name="calc-box-sub"),
+                                rx.el.div("리터(L) 단위 고정", id="calc-water-sub", class_name="calc-box-sub"),
                                 class_name="calc-box",
                             ),
                             rx.el.div(
                                 rx.el.div("필요한 농약 용량 (자동계산)", class_name="calc-box-label"),
-                                rx.el.div("20.0 mL (또는 g)", id="calc-pesticide-val", class_name="calc-box-value highlight"),
-                                rx.el.div("1,000배 희석 기준", id="calc-pesticide-sub", class_name="calc-box-sub"),
+                                rx.el.div("-", id="calc-pesticide-val", class_name="calc-box-value highlight"),
+                                rx.el.div("농약을 먼저 선택하세요", id="calc-pesticide-sub", class_name="calc-box-sub"),
                                 class_name="calc-box",
                             ),
                             class_name="calc-grid",
@@ -346,7 +335,7 @@ def index() -> rx.Component:
             class_name="app-wrapper",
         ),
         # ==========================================
-        # 5. 상세 안전사용지침 즉시 팝업 모달 (스크롤 불필요)
+        # 5. 상세 안전사용지침 즉시 팝업 모달
         # ==========================================
         rx.el.div(
             rx.el.div(
