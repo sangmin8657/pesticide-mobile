@@ -17,7 +17,7 @@ def searchable_select(prefix: str, label_text: str, placeholder_text: str) -> rx
                 "×",
                 id=f"{prefix}-clear",
                 type="button",
-                title="전체로 초기화",
+                title="초기화",
                 class_name="combo-clear-btn",
                 style={"display": "none"},
             ),
@@ -141,7 +141,7 @@ def index() -> rx.Component:
                     id="metric-section",
                     class_name="metric-container",
                 ),
-                # (3) 검색 결과 목록 & CSV 다운로드 (상단 배치)
+                # (3) 검색 결과 목록 & CSV 다운로드 (항목 터치 시 즉시 상세 팝업 오픈)
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2("📋 검색 결과 목록", class_name="section-title"),
@@ -153,49 +153,78 @@ def index() -> rx.Component:
                         ),
                         class_name="section-header-row",
                     ),
+                    rx.el.p(
+                        "💡 아래 목록에서 농약 카드를 터치하면 상세 안전사용지침이 바로 열립니다.",
+                        class_name="sub-caption",
+                    ),
                     rx.el.div(id="list-notice", class_name="info-banner", style={"display": "none"}),
                     rx.el.div(id="result-list", class_name="result-list"),
-                    class_name="card-box",
-                ),
-                # (4) 상세 안전사용지침 카드 (하단 배치)
-                rx.el.div(
-                    rx.el.h2("🔎 검색된 농약 상세 안전사용지침", class_name="section-title"),
-                    rx.el.div(
-                        rx.el.label(
-                            "위 목록에서 카드를 터치하거나 아래에서 농약을 선택하면 상세 지침이 표시됩니다:",
-                            html_for="detail-select",
-                            class_name="field-label",
-                        ),
-                        rx.el.select(id="detail-select", class_name="form-control"),
-                        style={"marginTop": "8px", "marginBottom": "12px"},
-                    ),
-                    rx.el.div(id="detail-card-container"),
-                    id="detail-section",
                     class_name="card-box",
                 ),
                 id="tab-panel-search",
             ),
             # ==========================================
-            # TAB 2: 희석배수 계산기
+            # TAB 2: 희석배수 계산기 (작물·농약 검색 연동)
             # ==========================================
             rx.el.div(
                 rx.el.div(
-                    rx.el.h2("🧪 희석배수 계산기", class_name="section-title"),
+                    rx.el.div(
+                        rx.el.h2("🧪 희석배수 계산기", class_name="section-title"),
+                        rx.el.button(
+                            "↺ 계산기 초기화",
+                            id="calc-reset-btn",
+                            class_name="reset-btn",
+                            type="button",
+                        ),
+                        class_name="section-header-row",
+                    ),
                     rx.el.p(
-                        "살포할 물의 양과 희석배수를 입력하면 필요한 농약 용량이 자동으로 계산됩니다.",
+                        "적용작물과 농약을 검색해 선택하면 기준 희석배수가 자동 입력됩니다. 살포할 물의 양만 입력하세요.",
                         class_name="sub-caption",
                     ),
+                    # ① 적용작물 및 농약 검색 선택 영역
+                    rx.el.div(
+                        searchable_select(
+                            "calc-crop",
+                            "1단계. 적용작물 선택 (선택 또는 검색)",
+                            "전체 작물 (예: 잔디 입력)",
+                        ),
+                        searchable_select(
+                            "calc-pesticide",
+                            "2단계. 농약 선택 (상표명 / 품목명 / 병해충 검색)",
+                            "농약명 또는 병해충명 입력...",
+                        ),
+                        class_name="calc-search-grid",
+                    ),
+                    # 선택된 농약의 기준 희석배수 안내 박스
+                    rx.el.div(
+                        id="calc-selected-info",
+                        class_name="calc-selected-box",
+                        style={"display": "none"},
+                    ),
+                    # ② 물의 양 및 희석배수 입력 영역
                     rx.el.div(
                         rx.el.div(
-                            rx.el.div("1. 입력단위 선택", class_name="field-label"),
+                            rx.el.div("3단계. 입력단위 선택", class_name="field-label"),
                             rx.el.div(
                                 rx.el.label(
-                                    rx.el.input(type="radio", name="unit-type", value="L", default_checked=True),
+                                    rx.el.input(
+                                        id="unit-radio-l",
+                                        type="radio",
+                                        name="unit-type",
+                                        value="L",
+                                        default_checked=True,
+                                    ),
                                     " 리터 (L)",
                                     class_name="radio-label",
                                 ),
                                 rx.el.label(
-                                    rx.el.input(type="radio", name="unit-type", value="MAL"),
+                                    rx.el.input(
+                                        id="unit-radio-mal",
+                                        type="radio",
+                                        name="unit-type",
+                                        value="MAL",
+                                    ),
                                     " 말 (1말 = 20L)",
                                     class_name="radio-label",
                                 ),
@@ -205,7 +234,7 @@ def index() -> rx.Component:
                         ),
                         rx.el.div(
                             rx.el.label(
-                                "2. 살포할 물의 양 (L)",
+                                "4단계. 살포할 물의 양 (L)",
                                 id="water-input-label",
                                 html_for="water-input",
                                 class_name="field-label",
@@ -222,7 +251,7 @@ def index() -> rx.Component:
                             class_name="filter-item",
                         ),
                         rx.el.div(
-                            rx.el.label("3. 희석배수 (배)", html_for="dilution-input", class_name="field-label"),
+                            rx.el.label("5단계. 적용 희석배수 (배)", html_for="dilution-input", class_name="field-label"),
                             rx.el.input(
                                 id="dilution-input",
                                 type="number",
@@ -242,7 +271,9 @@ def index() -> rx.Component:
                             class_name="filter-item",
                         ),
                         class_name="filter-grid",
+                        style={"marginTop": "12px"},
                     ),
+                    # ③ 자동 계산 결과 출력
                     rx.el.div(
                         rx.el.div("💡 자동 계산 결과", class_name="calc-result-title"),
                         rx.el.div(
@@ -253,9 +284,9 @@ def index() -> rx.Component:
                                 class_name="calc-box",
                             ),
                             rx.el.div(
-                                rx.el.div("농약 용량 (자동계산)", class_name="calc-box-label"),
+                                rx.el.div("필요한 농약 용량 (자동계산)", class_name="calc-box-label"),
                                 rx.el.div("20.0 mL (또는 g)", id="calc-pesticide-val", class_name="calc-box-value highlight"),
-                                rx.el.div("희석배수 기준 산출량", class_name="calc-box-sub"),
+                                rx.el.div("1,000배 희석 기준", id="calc-pesticide-sub", class_name="calc-box-sub"),
                                 class_name="calc-box",
                             ),
                             class_name="calc-grid",
@@ -266,6 +297,7 @@ def index() -> rx.Component:
                                 rx.el.li("액체 농약(액상수화제, 유제 등)은 1mL ≒ 1g으로 간주하여 계산됩니다."),
                                 rx.el.li("약제를 먼저 소량의 물에 완전히 희석한 후 전체 물통에 섞으면 균일하게 혼합됩니다."),
                             ),
+                            id="calc-usage-guide",
                             class_name="guide-callout",
                         ),
                         class_name="calc-result-panel",
@@ -312,6 +344,29 @@ def index() -> rx.Component:
                 class_name="footer-container",
             ),
             class_name="app-wrapper",
+        ),
+        # ==========================================
+        # 5. 상세 안전사용지침 즉시 팝업 모달 (스크롤 불필요)
+        # ==========================================
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    rx.el.span("🔎 상세 안전사용지침", class_name="modal-header-title"),
+                    rx.el.button(
+                        "✕ 닫기",
+                        id="detail-modal-close",
+                        type="button",
+                        class_name="modal-close-btn",
+                    ),
+                    class_name="modal-header",
+                ),
+                rx.el.div(id="detail-modal-body", class_name="modal-body"),
+                id="detail-modal-dialog",
+                class_name="modal-dialog",
+            ),
+            id="detail-modal-overlay",
+            class_name="modal-overlay",
+            style={"display": "none"},
         ),
         class_name="page-bg",
     )
