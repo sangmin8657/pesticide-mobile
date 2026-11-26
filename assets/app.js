@@ -1,7 +1,21 @@
 (function () {
+  if (window.__PESTICIDE_APP_BOOTED__) return;
+  window.__PESTICIDE_APP_BOOTED__ = true;
+
   let allData = [];
   let filteredData = [];
   let uniqueDetailRows = [];
+  let isFetching = false;
+  let fetchErrorMsg = "";
+
+  // 현재 선택 상태 유지 (React 재렌더링 시에도 보존)
+  const state = {
+    use: "전체",
+    crop: "전체",
+    pest: "전체",
+    keyword: "",
+    activeTab: "search",
+  };
 
   function escapeHtml(val) {
     return String(val ?? "-")
@@ -9,6 +23,19 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function highlightMatch(text, query) {
+    const raw = String(text ?? "");
+    const q = query.trim();
+    if (!q) return escapeHtml(raw);
+    const idx = raw.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return escapeHtml(raw);
+    return (
+      escapeHtml(raw.slice(0, idx)) +
+      `<span class="combo-highlight">${escapeHtml(raw.slice(idx, idx + q.length))}</span>` +
+      escapeHtml(raw.slice(idx + q.length))
+    );
   }
 
   function getUniqueOptions(rows, col) {
@@ -20,18 +47,133 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
   }
 
-  function populateSelect(selectEl, options, keepValue = false) {
-    const prev = selectEl.value;
-    selectEl.innerHTML =
-      '<option value="전체">전체</option>' +
-      options
-        .map((opt) => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`)
-        .join("");
-    if (keepValue && options.includes(prev)) {
-      selectEl.value = prev;
-    } else {
-      selectEl.value = "전체";
+  function closeAllDropdowns(exceptPrefix = "") {
+    ["use", "crop", "pest"].forEach((p) => {
+      if (p !== exceptPrefix) {
+        const dd = document.getElementById(`${p}-dropdown`);
+        if (dd) dd.style.display = "none";
+      }
+    });
+  }
+
+  // 목록 선택(▼) + 검색어 자동완성을 동시에 지원하는 콤보박스
+  function bindSearchableSelect(prefix, getOptionsFn, onSelectCallback) {
+    const wrapper = document.getElementById(`${prefix}-wrapper`);
+    const input = document.getElementById(`${prefix}-input`);
+    const clearBtn = document.getElementById(`${prefix}-clear`);
+    const toggleBtn = document.getElementById(`${prefix}-toggle`);
+    const dropdown = document.getElementById(`${prefix}-dropdown`);
+
+    function updateClearButton() {
+      clearBtn.style.display =
+        state[prefix] !== "전체" || input.value.trim() !== "" ? "flex" : "none";
     }
+
+    // 기존 상태 복원
+    input.value = state[prefix] === "전체" ? "" : state[prefix];
+    updateClearButton();
+
+    function renderDropdown(query = "") {
+      const options = getOptionsFn();
+      const q = query.trim().toLowerCase();
+      const matched = q
+        ? options.filter((opt) => opt.toLowerCase().includes(q))
+        : options;
+
+      const headerText = q
+        ? `검색 결과 ${matched.length.toLocaleString()}개 (터치하여 선택)`
+        : `전체 목록 ${options.length.toLocaleString()}개 (터치 선택 또는 검색어 입력)`;
+
+      let html = `<div class="combo-header">${headerText}</div>`;
+      html += `<div class="combo-option ${state[prefix] === "전체" ? "selected" : ""}" data-val="전체">전체</div>`;
+
+      if (matched.length === 0) {
+        html += `<div class="combo-empty">'${escapeHtml(query)}'와 일치하는 항목이 없습니다</div>`;
+      } else {
+        html += matched
+          .map(
+            (opt) =>
+              `<div class="combo-option ${state[prefix] === opt ? "selected" : ""}" data-val="${escapeHtml(opt)}">${highlightMatch(opt, query)}</div>`
+          )
+          .join("");
+      }
+
+      dropdown.innerHTML = html;
+
+      dropdown.querySelectorAll(".combo-option").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = el.dataset.val;
+          state[prefix] = val;
+          input.value = val === "전체" ? "" : val;
+          dropdown.style.display = "none";
+          updateClearButton();
+          onSelectCallback(val);
+        });
+      });
+    }
+
+    toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = dropdown.style.display === "block";
+      closeAllDropdowns(prefix);
+      if (isOpen) {
+        dropdown.style.display = "none";
+      } else {
+        renderDropdown("");
+        dropdown.style.display = "block";
+        const activeEl = dropdown.querySelector(".combo-option.selected");
+        if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
+      }
+    });
+
+    input.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeAllDropdowns(prefix);
+      renderDropdown("");
+      dropdown.style.display = "block";
+      if (input.value) {
+        input.select();
+      }
+    });
+
+    input.addEventListener("input", () => {
+      const options = getOptionsFn();
+      const trimmed = input.value.trim();
+      updateClearButton();
+      renderDropdown(trimmed);
+      dropdown.style.display = "block";
+
+      if (trimmed === "" || trimmed === "전체") {
+        if (state[prefix] !== "전체") {
+          state[prefix] = "전체";
+          onSelectCallback("전체");
+        }
+      } else {
+        const exact = options.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
+        if (exact && state[prefix] !== exact) {
+          state[prefix] = exact;
+          onSelectCallback(exact);
+        }
+      }
+    });
+
+    clearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state[prefix] = "전체";
+      input.value = "";
+      dropdown.style.display = "none";
+      updateClearButton();
+      onSelectCallback("전체");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!wrapper.contains(e.target)) {
+        dropdown.style.display = "none";
+        input.value = state[prefix] === "전체" ? "" : state[prefix];
+        updateClearButton();
+      }
+    });
   }
 
   function renderDetailCard(row) {
@@ -108,6 +250,9 @@
   }
 
   function renderMetrics(rows) {
+    const totalEl = document.getElementById("metric-total");
+    if (!totalEl) return;
+
     const crops = new Set();
     const pests = new Set();
     const brands = new Set();
@@ -118,7 +263,7 @@
       if (r["상표명"]) brands.add(r["상표명"]);
     }
 
-    document.getElementById("metric-total").textContent = `${rows.length.toLocaleString()} 건`;
+    totalEl.textContent = `${rows.length.toLocaleString()} 건`;
     document.getElementById("metric-crops").textContent = `${crops.size.toLocaleString()} 개`;
     document.getElementById("metric-pests").textContent = `${pests.size.toLocaleString()} 개`;
     document.getElementById("metric-brands").textContent = `${brands.size.toLocaleString()} 개`;
@@ -127,6 +272,8 @@
   function renderList(rows) {
     const listEl = document.getElementById("result-list");
     const noticeEl = document.getElementById("list-notice");
+    if (!listEl || !noticeEl) return;
+
     const MAX_DISPLAY = 200;
 
     if (rows.length > MAX_DISPLAY) {
@@ -178,15 +325,17 @@
   }
 
   function applyFilters() {
-    const selectedUse = document.getElementById("use-select").value;
-    const selectedCrop = document.getElementById("crop-select").value;
-    const selectedPest = document.getElementById("pest-select").value;
-    const kw = document.getElementById("keyword-input").value.trim().toLowerCase();
+    if (allData.length === 0) return;
+
+    const kwInput = document.getElementById("keyword-input");
+    if (kwInput) state.keyword = kwInput.value;
+
+    const kw = state.keyword.trim().toLowerCase();
 
     filteredData = allData.filter((r) => {
-      if (selectedUse !== "전체" && r["용도"] !== selectedUse) return false;
-      if (selectedCrop !== "전체" && r["작물명"] !== selectedCrop) return false;
-      if (selectedPest !== "전체" && r["적용병해충"] !== selectedPest) return false;
+      if (state.use !== "전체" && r["용도"] !== state.use) return false;
+      if (state.crop !== "전체" && r["작물명"] !== state.crop) return false;
+      if (state.pest !== "전체" && r["적용병해충"] !== state.pest) return false;
       if (kw) {
         const match =
           String(r["상표명"] || "").toLowerCase().includes(kw) ||
@@ -230,10 +379,14 @@
   }
 
   function updateCalculator() {
+    const waterEl = document.getElementById("water-input");
+    const dilutionEl = document.getElementById("dilution-input");
+    if (!waterEl || !dilutionEl) return;
+
     const unitEl = document.querySelector('input[name="unit-type"]:checked');
     const unit = unitEl ? unitEl.value : "L";
-    const waterVal = parseFloat(document.getElementById("water-input").value) || 0;
-    const ratio = parseFloat(document.getElementById("dilution-input").value) || 0;
+    const waterVal = parseFloat(waterEl.value) || 0;
+    const ratio = parseFloat(dilutionEl.value) || 0;
 
     const waterMl = unit === "L" ? waterVal * 1000.0 : waterVal * 20.0 * 1000.0;
     const totalL = waterMl / 1000.0;
@@ -245,15 +398,118 @@
     document.getElementById("calc-pesticide-val").textContent = `${pesticideMl.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mL (또는 g)`;
   }
 
-  async function initApp() {
-    const useSelect = document.getElementById("use-select");
-    if (!useSelect || useSelect.dataset.bound === "true") return;
-    useSelect.dataset.bound = "true";
+  async function loadDataOnce() {
+    if (allData.length > 0 || isFetching) return;
+    isFetching = true;
 
-    const cropSelect = document.getElementById("crop-select");
-    const pestSelect = document.getElementById("pest-select");
+    try {
+      const metaRes = await fetch("/pesticide_meta.json");
+      if (!metaRes.ok) throw new Error(`메타 데이터 응답 오류 (${metaRes.status})`);
+      const meta = await metaRes.json();
+      const cols = meta.columns;
+
+      const partArrays = await Promise.all(
+        meta.chunks.map((file) =>
+          fetch("/" + file).then((r) => {
+            if (!r.ok) throw new Error(`분할 데이터 오류 (${file}: ${r.status})`);
+            return r.json();
+          })
+        )
+      );
+
+      const loaded = [];
+      for (const part of partArrays) {
+        for (const arr of part) {
+          const obj = {};
+          for (let i = 0; i < cols.length; i++) {
+            obj[cols[i]] = arr[i];
+          }
+          loaded.push(obj);
+        }
+      }
+
+      allData = loaded;
+      applyFilters();
+    } catch (e) {
+      fetchErrorMsg = e.message || "데이터 로딩 실패";
+      const totalEl = document.getElementById("metric-total");
+      const listEl = document.getElementById("result-list");
+      if (totalEl) totalEl.textContent = "오류";
+      if (listEl) {
+        listEl.innerHTML = `<div style="padding:20px;text-align:center;color:#dc2626;">데이터를 불러오지 못했습니다: ${escapeHtml(fetchErrorMsg)}</div>`;
+      }
+      console.error("데이터 로딩 실패:", e);
+    } finally {
+      isFetching = false;
+    }
+  }
+
+  function bindDomElements() {
+    const useInput = document.getElementById("use-input");
+    if (!useInput || useInput.dataset.bound === "true") return;
+    useInput.dataset.bound = "true";
+
     const keywordInput = document.getElementById("keyword-input");
+    const searchSubmitBtn = document.getElementById("search-submit-btn");
     const detailSelect = document.getElementById("detail-select");
+
+    if (keywordInput && state.keyword) {
+      keywordInput.value = state.keyword;
+    }
+
+    // 3단 연동 콤보박스 바인딩
+    bindSearchableSelect(
+      "use",
+      () => getUniqueOptions(allData, "용도"),
+      (val) => {
+        const step1 = val === "전체" ? allData : allData.filter((r) => r["용도"] === val);
+        const validCrops = getUniqueOptions(step1, "작물명");
+        if (state.crop !== "전체" && !validCrops.includes(state.crop)) {
+          state.crop = "전체";
+          const cropInput = document.getElementById("crop-input");
+          if (cropInput) cropInput.value = "";
+        }
+        const step2 = state.crop === "전체" ? step1 : step1.filter((r) => r["작물명"] === state.crop);
+        const validPests = getUniqueOptions(step2, "적용병해충");
+        if (state.pest !== "전체" && !validPests.includes(state.pest)) {
+          state.pest = "전체";
+          const pestInput = document.getElementById("pest-input");
+          if (pestInput) pestInput.value = "";
+        }
+        applyFilters();
+      }
+    );
+
+    bindSearchableSelect(
+      "crop",
+      () => {
+        const step1 = state.use === "전체" ? allData : allData.filter((r) => r["용도"] === state.use);
+        return getUniqueOptions(step1, "작물명");
+      },
+      (val) => {
+        const step1 = state.use === "전체" ? allData : allData.filter((r) => r["용도"] === state.use);
+        const step2 = val === "전체" ? step1 : step1.filter((r) => r["작물명"] === val);
+        const validPests = getUniqueOptions(step2, "적용병해충");
+        if (state.pest !== "전체" && !validPests.includes(state.pest)) {
+          state.pest = "전체";
+          const pestInput = document.getElementById("pest-input");
+          if (pestInput) pestInput.value = "";
+        }
+        applyFilters();
+      }
+    );
+
+    bindSearchableSelect(
+      "pest",
+      () => {
+        const step1 = state.use === "전체" ? allData : allData.filter((r) => r["용도"] === state.use);
+        const step2 = state.crop === "전체" ? step1 : step1.filter((r) => r["작물명"] === state.crop);
+        return getUniqueOptions(step2, "적용병해충");
+      },
+      () => {
+        applyFilters();
+      }
+    );
 
     // 탭 전환 이벤트
     const tabSearchBtn = document.getElementById("tab-btn-search");
@@ -261,81 +517,60 @@
     const panelSearch = document.getElementById("tab-panel-search");
     const panelCalc = document.getElementById("tab-panel-calc");
 
-    tabSearchBtn.addEventListener("click", () => {
-      tabSearchBtn.classList.add("active");
-      tabCalcBtn.classList.remove("active");
-      panelSearch.style.display = "block";
-      panelCalc.style.display = "none";
-    });
-
-    tabCalcBtn.addEventListener("click", () => {
-      tabCalcBtn.classList.add("active");
-      tabSearchBtn.classList.remove("active");
-      panelCalc.style.display = "block";
-      panelSearch.style.display = "none";
-    });
-
-    // 데이터 로딩 (분할된 JSON 병렬 로드)
-    try {
-      const metaRes = await fetch("/pesticide_meta.json");
-      const meta = await metaRes.json();
-      const cols = meta.columns;
-
-      const partArrays = await Promise.all(
-        meta.chunks.map((file) => fetch("/" + file).then((r) => r.json()))
-      );
-
-      allData = [];
-      for (const part of partArrays) {
-        for (const arr of part) {
-          const obj = {};
-          for (let i = 0; i < cols.length; i++) {
-            obj[cols[i]] = arr[i];
-          }
-          allData.push(obj);
-        }
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      if (tabName === "search") {
+        tabSearchBtn.classList.add("active");
+        tabCalcBtn.classList.remove("active");
+        panelSearch.style.display = "block";
+        panelCalc.style.display = "none";
+      } else {
+        tabCalcBtn.classList.add("active");
+        tabSearchBtn.classList.remove("active");
+        panelCalc.style.display = "block";
+        panelSearch.style.display = "none";
       }
-
-      populateSelect(useSelect, getUniqueOptions(allData, "용도"));
-      populateSelect(cropSelect, getUniqueOptions(allData, "작물명"));
-      populateSelect(pestSelect, getUniqueOptions(allData, "적용병해충"));
-      applyFilters();
-    } catch (e) {
-      document.getElementById("metric-total").textContent = "오류";
-      console.error("데이터 로딩 실패:", e);
     }
 
-    // 3단 연동 필터 이벤트
-    useSelect.addEventListener("change", () => {
-      const step1 =
-        useSelect.value === "전체"
-          ? allData
-          : allData.filter((r) => r["용도"] === useSelect.value);
-      populateSelect(cropSelect, getUniqueOptions(step1, "작물명"));
-      populateSelect(pestSelect, getUniqueOptions(step1, "적용병해충"));
+    switchTab(state.activeTab);
+    tabSearchBtn.addEventListener("click", () => switchTab("search"));
+    tabCalcBtn.addEventListener("click", () => switchTab("calc"));
+
+    // 키워드 입력 실시간 반영 + 검색 버튼/엔터키 실행
+    function executeKeywordSearch(scrollToResults = false) {
       applyFilters();
+      if (scrollToResults) {
+        keywordInput.blur();
+        const metricEl = document.getElementById("metric-section");
+        if (metricEl) metricEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    keywordInput.addEventListener("input", () => executeKeywordSearch(false));
+    keywordInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        executeKeywordSearch(true);
+      }
     });
+    if (searchSubmitBtn) {
+      searchSubmitBtn.addEventListener("click", () => executeKeywordSearch(true));
+    }
 
-    cropSelect.addEventListener("change", () => {
-      const step1 =
-        useSelect.value === "전체"
-          ? allData
-          : allData.filter((r) => r["용도"] === useSelect.value);
-      const step2 =
-        cropSelect.value === "전체"
-          ? step1
-          : step1.filter((r) => r["작물명"] === cropSelect.value);
-      populateSelect(pestSelect, getUniqueOptions(step2, "적용병해충"));
-      applyFilters();
-    });
-
-    pestSelect.addEventListener("change", applyFilters);
-    keywordInput.addEventListener("input", applyFilters);
-
+    // 조건 초기화 버튼
     document.getElementById("reset-btn").addEventListener("click", () => {
-      populateSelect(useSelect, getUniqueOptions(allData, "용도"));
-      populateSelect(cropSelect, getUniqueOptions(allData, "작물명"));
-      populateSelect(pestSelect, getUniqueOptions(allData, "적용병해충"));
+      state.use = "전체";
+      state.crop = "전체";
+      state.pest = "전체";
+      state.keyword = "";
+      ["use", "crop", "pest"].forEach((p) => {
+        const inp = document.getElementById(`${p}-input`);
+        const clr = document.getElementById(`${p}-clear`);
+        const dd = document.getElementById(`${p}-dropdown`);
+        if (inp) inp.value = "";
+        if (clr) clr.style.display = "none";
+        if (dd) dd.style.display = "none";
+      });
       keywordInput.value = "";
       applyFilters();
     });
@@ -365,22 +600,37 @@
       });
     });
 
-    document.getElementById("water-input").addEventListener("input", updateCalculator);
-    document.getElementById("dilution-input").addEventListener("input", updateCalculator);
+    const waterInput = document.getElementById("water-input");
+    const dilutionInput = document.getElementById("dilution-input");
+    waterInput.addEventListener("input", updateCalculator);
+    waterInput.addEventListener("change", updateCalculator);
+    dilutionInput.addEventListener("input", updateCalculator);
+    dilutionInput.addEventListener("change", updateCalculator);
+
     document.querySelectorAll(".preset-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        document.getElementById("dilution-input").value = btn.dataset.ratio;
+        dilutionInput.value = btn.dataset.ratio;
         updateCalculator();
       });
     });
 
     updateCalculator();
+
+    // 이미 데이터가 로드된 상태(React 재렌더링 직후)라면 즉시 화면 갱신
+    if (allData.length > 0) {
+      applyFilters();
+    } else if (fetchErrorMsg) {
+      document.getElementById("metric-total").textContent = "오류";
+    } else {
+      loadDataOnce();
+    }
   }
 
-  const timer = setInterval(() => {
-    if (document.getElementById("use-select")) {
-      initApp();
-      clearInterval(timer);
-    }
-  }, 100);
+  // React Hydration 이후에도 DOM 요소가 재생성되면 자동으로 재연결
+  setInterval(bindDomElements, 250);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindDomElements);
+  } else {
+    bindDomElements();
+  }
 })();
