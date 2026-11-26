@@ -14,9 +14,12 @@
     pest: "전체",
     keyword: "",
     activeTab: "search",
+    calcUse: "전체",
     calcCrop: "전체",
+    calcPest: "전체",
     calcPesticideLabel: "",
     calcSelectedRow: null,
+    calcCustomRatio: "",
   };
 
   function escapeHtml(val) {
@@ -49,7 +52,7 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
   }
 
-  // 희석배수 문자열(예: "1,000배", "500~1,000배", "1000")에서 숫자 배열 추출
+  // 희석배수 문자열(예: "1,000배", "500~1,000배")에서 숫자 배열 추출
   function parseDilutionRatios(rawStr) {
     const s = String(rawStr ?? "").trim();
     if (!s || s === "-" || s.includes("원액") || s.includes("해당없음")) {
@@ -61,8 +64,29 @@
     return matches.map(Number).filter((n) => n > 0);
   }
 
+  // 범위 희석배수 여부 판별 (예: 500~1,000배 -> { isRange: true, min: 500, max: 1000 })
+  function getRangeInfo(row) {
+    if (!row) return { isRange: false, ratios: [], min: 0, max: 0 };
+    const ratios = parseDilutionRatios(row["희석배수"]);
+    if (ratios.length >= 2) {
+      const min = Math.min(...ratios);
+      const max = Math.max(...ratios);
+      if (min < max) {
+        return { isRange: true, ratios, min, max };
+      }
+    }
+    return { isRange: false, ratios, min: ratios[0] || 0, max: ratios[0] || 0 };
+  }
+
+  function getStateKeyForPrefix(prefix) {
+    if (prefix === "calc-use") return "calcUse";
+    if (prefix === "calc-crop") return "calcCrop";
+    if (prefix === "calc-pest") return "calcPest";
+    return prefix;
+  }
+
   function closeAllDropdowns(exceptPrefix = "") {
-    ["use", "crop", "pest", "calc-crop", "calc-pesticide"].forEach((p) => {
+    ["use", "crop", "pest", "calc-use", "calc-crop", "calc-pest", "calc-pesticide"].forEach((p) => {
       if (p !== exceptPrefix) {
         const dd = document.getElementById(`${p}-dropdown`);
         const inp = document.getElementById(`${p}-input`);
@@ -72,7 +96,7 @@
             if (p === "calc-pesticide") {
               inp.value = state.calcPesticideLabel || "";
             } else {
-              const key = p === "calc-crop" ? "calcCrop" : p;
+              const key = getStateKeyForPrefix(p);
               inp.value = state[key] === "전체" ? "" : state[key];
             }
           }
@@ -81,14 +105,12 @@
     });
   }
 
-  // 바깥 영역 클릭 시 열려있는 콤보박스 드롭다운 닫기
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".combo-wrapper")) {
       closeAllDropdowns("");
     }
   });
 
-  // ESC 키로 상세 팝업 모달 닫기
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeDetailModal();
@@ -102,7 +124,7 @@
     const toggleBtn = document.getElementById(`${prefix}-toggle`);
     const dropdown = document.getElementById(`${prefix}-dropdown`);
 
-    const stateKey = prefix === "calc-crop" ? "calcCrop" : prefix;
+    const stateKey = getStateKeyForPrefix(prefix);
 
     function updateClearButton() {
       clearBtn.style.display =
@@ -208,7 +230,102 @@
     });
   }
 
-  // 계산기 탭 전용: 농약(상표명/품목명/병해충) 검색 선택기
+  // 계산기 탭 1~3번 조건에 맞는 후보 농약 목록 반환
+  function getCalcCandidateRows() {
+    return allData.filter((r) => {
+      if (state.calcUse !== "전체" && r["용도"] !== state.calcUse) return false;
+      if (state.calcCrop !== "전체" && r["작물명"] !== state.calcCrop) return false;
+      if (state.calcPest !== "전체" && r["적용병해충"] !== state.calcPest) return false;
+      return true;
+    });
+  }
+
+  function updateCalcMatchHint() {
+    const hintEl = document.getElementById("calc-match-count");
+    if (!hintEl) return;
+    if (allData.length === 0) {
+      hintEl.textContent = "데이터 로딩 중...";
+      return;
+    }
+    const candidates = getCalcCandidateRows();
+    hintEl.textContent = `현재 조건에 해당하는 농약: ${candidates.length.toLocaleString()}건`;
+  }
+
+  // 희석배수 입력창의 잠금/해제 UI 동기화
+  function syncDilutionInputLockState(preserveCustomValue = false) {
+    const dilutionInput = document.getElementById("dilution-input");
+    const lockBadge = document.getElementById("dilution-lock-badge");
+    const rangeHint = document.getElementById("dilution-range-hint");
+    const labelEl = document.getElementById("dilution-input-label");
+    if (!dilutionInput || !lockBadge) return;
+
+    const row = state.calcSelectedRow;
+    if (!row) {
+      dilutionInput.type = "text";
+      dilutionInput.readOnly = true;
+      dilutionInput.tabIndex = -1;
+      dilutionInput.value = "";
+      dilutionInput.className = "form-control locked-ratio-input";
+      lockBadge.textContent = "🔒 고정";
+      lockBadge.className = "lock-fixed-badge";
+      if (labelEl) labelEl.textContent = "3단계. 적용 희석배수 (범위 등록 농약만 입력 가능)";
+      if (rangeHint) rangeHint.style.display = "none";
+      return;
+    }
+
+    const rangeInfo = getRangeInfo(row);
+    if (rangeInfo.isRange) {
+      dilutionInput.type = "number";
+      dilutionInput.readOnly = false;
+      dilutionInput.tabIndex = 0;
+      dilutionInput.min = String(rangeInfo.min);
+      dilutionInput.max = String(rangeInfo.max);
+      dilutionInput.step = "any";
+      dilutionInput.inputMode = "numeric";
+      dilutionInput.className = "form-control editable-ratio-input";
+
+      if (!preserveCustomValue || !state.calcCustomRatio) {
+        state.calcCustomRatio = String(rangeInfo.min);
+      }
+      dilutionInput.value = state.calcCustomRatio;
+
+      lockBadge.textContent = "✏️ 직접 입력";
+      lockBadge.className = "editable-ratio-badge";
+      if (labelEl) {
+        labelEl.textContent = `3단계. 적용 희석배수 (${rangeInfo.min.toLocaleString()}~${rangeInfo.max.toLocaleString()}배 범위 내 직접 입력)`;
+      }
+      if (rangeHint) {
+        rangeHint.style.display = "block";
+        rangeHint.className = "dilution-range-hint";
+        rangeHint.textContent = `입력 가능 범위: ${rangeInfo.min.toLocaleString()} ~ ${rangeInfo.max.toLocaleString()}배`;
+      }
+    } else {
+      dilutionInput.type = "text";
+      dilutionInput.readOnly = true;
+      dilutionInput.tabIndex = -1;
+      dilutionInput.value = String(row["희석배수"] || "-");
+      dilutionInput.className = "form-control locked-ratio-input";
+      lockBadge.textContent = "🔒 고정";
+      lockBadge.className = "lock-fixed-badge";
+      if (labelEl) labelEl.textContent = "3단계. 적용 희석배수 (단일 배수 · 수정 불가)";
+      if (rangeHint) rangeHint.style.display = "none";
+    }
+  }
+
+  function clearCalcSelectedPesticide() {
+    state.calcSelectedRow = null;
+    state.calcPesticideLabel = "";
+    state.calcCustomRatio = "";
+    const pInput = document.getElementById("calc-pesticide-input");
+    const pClear = document.getElementById("calc-pesticide-clear");
+    if (pInput) pInput.value = "";
+    if (pClear) pClear.style.display = "none";
+    syncDilutionInputLockState(false);
+    renderCalcSelectedInfo();
+    updateCalculator();
+  }
+
+  // 계산기 탭 4번: 최종 농약 선택기 (상표명 / 품목명 / 성분명 검색 후 선택)
   function bindCalcPesticideSelect() {
     const prefix = "calc-pesticide";
     const input = document.getElementById(`${prefix}-input`);
@@ -224,15 +341,8 @@
     input.value = state.calcPesticideLabel || "";
     updateClearButton();
 
-    function getCandidateRows() {
-      if (state.calcCrop && state.calcCrop !== "전체") {
-        return allData.filter((r) => r["작물명"] === state.calcCrop);
-      }
-      return allData;
-    }
-
     function renderDropdown(query = "") {
-      const baseRows = getCandidateRows();
+      const baseRows = getCalcCandidateRows();
       const q = query.trim().toLowerCase();
 
       const matched = [];
@@ -243,36 +353,35 @@
           const hit =
             String(r["상표명"] || "").toLowerCase().includes(q) ||
             String(r["품목명"] || "").toLowerCase().includes(q) ||
-            String(r["적용병해충"] || "").toLowerCase().includes(q) ||
             String(r["일반명"] || "").toLowerCase().includes(q) ||
-            String(r["작물명"] || "").toLowerCase().includes(q);
+            String(r["적용병해충"] || "").toLowerCase().includes(q);
           if (!hit) continue;
         }
-        const key = `${r["상표명"]}|${r["작물명"]}|${r["적용병해충"]}|${r["희석배수"]}`;
+        const key = `${r["상표명"]}|${r["품목명"]}|${r["작물명"]}|${r["적용병해충"]}|${r["희석배수"]}`;
         if (!seen.has(key)) {
           seen.add(key);
           matched.push(r);
-          if (matched.length >= 150) break;
+          if (matched.length >= 200) break;
         }
       }
 
-      const scopeLabel = state.calcCrop !== "전체" ? `[${state.calcCrop}] ` : "";
       const headerText = q
-        ? `${scopeLabel}'${escapeHtml(query)}' 검색 결과 ${matched.length}건${matched.length === 150 ? " (상위 150건)" : ""}`
-        : `${scopeLabel}농약 목록 (상위 ${matched.length}건 · 농약명 또는 병해충 입력)`;
+        ? `'${escapeHtml(query)}' 검색 결과 ${matched.length}건${matched.length === 200 ? " (상위 200건)" : ""} · 터치하여 선택`
+        : `선택 가능한 농약 ${matched.length}건${matched.length === 200 ? " (상위 200건)" : ""} · 터치하여 선택`;
 
       let html = `<div class="combo-header">${headerText}</div>`;
 
       if (matched.length === 0) {
-        html += `<div class="combo-empty">일치하는 농약이 없습니다. 다른 검색어를 입력하세요.</div>`;
+        html += `<div class="combo-empty">일치하는 농약이 없습니다. 위 검색 조건을 확인하세요.</div>`;
       } else {
         html += matched
           .map((r, idx) => {
-            const titleText = `[${r["상표명"]}] ${r["작물명"]} · ${r["적용병해충"]}`;
-            const subText = `품목: ${r["품목명"]} | 기준 희석배수: ${r["희석배수"]} | 사용량: ${r["사용량"]}`;
+            const titleText = `[${r["상표명"]}] ${r["품목명"]} (${r["작물명"]} · ${r["적용병해충"]})`;
+            const subText = `성분: ${r["일반명"]} | 기준 희석배수: ${r["희석배수"]} | 사용량: ${r["사용량"]}`;
             const isSelected =
               state.calcSelectedRow &&
               state.calcSelectedRow["상표명"] === r["상표명"] &&
+              state.calcSelectedRow["품목명"] === r["품목명"] &&
               state.calcSelectedRow["작물명"] === r["작물명"] &&
               state.calcSelectedRow["적용병해충"] === r["적용병해충"];
 
@@ -294,7 +403,7 @@
           const idx = Number(el.dataset.idx);
           const chosenRow = matched[idx];
           if (!chosenRow) return;
-          applySelectedPesticideToCalc(chosenRow);
+          applySelectedPesticideToCalc(chosenRow, false);
           dropdown.style.display = "none";
           updateClearButton();
         });
@@ -331,17 +440,13 @@
 
     clearBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      state.calcSelectedRow = null;
-      state.calcPesticideLabel = "";
-      input.value = "";
+      clearCalcSelectedPesticide();
       dropdown.style.display = "none";
-      updateClearButton();
-      renderCalcSelectedInfo();
     });
   }
 
-  // 선택한 농약의 희석배수를 계산기에 자동 적용
-  function applySelectedPesticideToCalc(row) {
+  // 선택한 농약의 희석배수를 계산기에 적용 (범위 농약만 입력 잠금 해제)
+  function applySelectedPesticideToCalc(row, preserveCustomValue = false) {
     state.calcSelectedRow = row;
     const label = `[${row["상표명"]}] ${row["작물명"]} - ${row["적용병해충"]} (${row["희석배수"]})`;
     state.calcPesticideLabel = label;
@@ -351,12 +456,7 @@
     if (inputEl) inputEl.value = label;
     if (clearBtn) clearBtn.style.display = "flex";
 
-    const ratios = parseDilutionRatios(row["희석배수"]);
-    const dilutionInput = document.getElementById("dilution-input");
-    if (ratios.length > 0 && dilutionInput) {
-      dilutionInput.value = String(ratios[0]);
-    }
-
+    syncDilutionInputLockState(preserveCustomValue);
     renderCalcSelectedInfo();
     updateCalculator();
   }
@@ -382,26 +482,22 @@
       return;
     }
 
-    const ratios = parseDilutionRatios(row["희석배수"]);
+    const rangeInfo = getRangeInfo(row);
     let statusHtml = "";
     let rangeButtonsHtml = "";
 
-    if (ratios.length === 0) {
-      statusHtml = `<div style="color:#dc2626;font-weight:700;margin-top:4px;">⚠️ 이 약제는 희석배수 숫자가 없는 제품(입제·원액 등)입니다. 아래 기준 사용량을 확인하거나 배수를 직접 입력하세요.</div>`;
-    } else if (ratios.length > 1) {
-      statusHtml = `<div style="color:#15803d;font-weight:700;margin-top:4px;">✅ 기준 희석배수 범위(${escapeHtml(row["희석배수"])}) 중 <strong>${ratios[0].toLocaleString()}배</strong>가 자동 입력되었습니다.</div>`;
+    if (rangeInfo.ratios.length === 0) {
+      statusHtml = `<div style="color:#dc2626;font-weight:700;margin-top:4px;">⚠️ 이 농약은 희석배수 수치가 없는 제품(원액·입제 등)입니다. 아래 기준 사용량을 확인해 살포하세요.</div>`;
+    } else if (rangeInfo.isRange) {
+      statusHtml = `<div style="color:#15803d;font-weight:700;margin-top:4px;">✏️ 범위로 등록된 농약입니다. <strong>${rangeInfo.min.toLocaleString()} ~ ${rangeInfo.max.toLocaleString()}배</strong> 사이에서 직접 입력하거나 아래 버튼으로 선택하세요.</div>`;
       rangeButtonsHtml = `
         <div class="calc-range-btns">
-          ${ratios
-            .map(
-              (rVal) =>
-                `<button type="button" class="calc-range-btn" data-set-ratio="${rVal}">${rVal.toLocaleString()}배 적용하기</button>`
-            )
-            .join("")}
+          <button type="button" class="calc-range-btn" data-set-ratio="${rangeInfo.min}">최소 ${rangeInfo.min.toLocaleString()}배 적용</button>
+          <button type="button" class="calc-range-btn" data-set-ratio="${rangeInfo.max}">최대 ${rangeInfo.max.toLocaleString()}배 적용</button>
         </div>
       `;
     } else {
-      statusHtml = `<div style="color:#15803d;font-weight:700;margin-top:4px;">✅ 기준 희석배수 <strong>${ratios[0].toLocaleString()}배</strong>가 자동 입력되었습니다.</div>`;
+      statusHtml = `<div style="color:#1e40af;font-weight:700;margin-top:4px;">🔒 단일 희석배수(<strong>${escapeHtml(row["희석배수"])}</strong>)로 등록된 농약이므로 배수를 수정할 수 없습니다.</div>`;
     }
 
     infoBox.style.display = "block";
@@ -414,11 +510,13 @@
 
     infoBox.querySelectorAll(".calc-range-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
+        const ratioVal = btn.dataset.setRatio;
+        state.calcCustomRatio = ratioVal;
         const dilutionInput = document.getElementById("dilution-input");
         if (dilutionInput) {
-          dilutionInput.value = btn.dataset.setRatio;
-          updateCalculator();
+          dilutionInput.value = ratioVal;
         }
+        updateCalculator();
       });
     });
 
@@ -495,16 +593,23 @@
       calcJumpBtn.addEventListener("click", () => {
         closeDetailModal();
 
+        state.calcUse = row["용도"] || "전체";
         state.calcCrop = row["작물명"] || "전체";
-        const calcCropInput = document.getElementById("calc-crop-input");
-        const calcCropClear = document.getElementById("calc-crop-clear");
-        if (calcCropInput) {
-          calcCropInput.value = state.calcCrop === "전체" ? "" : state.calcCrop;
-        }
-        if (calcCropClear) {
-          calcCropClear.style.display = state.calcCrop !== "전체" ? "flex" : "none";
-        }
-        applySelectedPesticideToCalc(row);
+        state.calcPest = row["적용병해충"] || "전체";
+
+        [
+          ["calc-use", state.calcUse],
+          ["calc-crop", state.calcCrop],
+          ["calc-pest", state.calcPest],
+        ].forEach(([prefix, val]) => {
+          const inp = document.getElementById(`${prefix}-input`);
+          const clr = document.getElementById(`${prefix}-clear`);
+          if (inp) inp.value = val === "전체" ? "" : val;
+          if (clr) clr.style.display = val !== "전체" ? "flex" : "none";
+        });
+
+        updateCalcMatchHint();
+        applySelectedPesticideToCalc(row, false);
 
         const tabCalcBtn = document.getElementById("tab-btn-calc");
         if (tabCalcBtn) tabCalcBtn.click();
@@ -638,26 +743,75 @@
     URL.revokeObjectURL(url);
   }
 
+  // L 단위 고정 & 단일 배수는 고정 계산, 범위 배수는 사용자 입력값(허용 범위 검증)으로 계산
   function updateCalculator() {
     const waterEl = document.getElementById("water-input");
     const dilutionEl = document.getElementById("dilution-input");
-    if (!waterEl || !dilutionEl) return;
+    const rangeHint = document.getElementById("dilution-range-hint");
+    const waterMainEl = document.getElementById("calc-water-main");
+    const pestValEl = document.getElementById("calc-pesticide-val");
+    const pestSubEl = document.getElementById("calc-pesticide-sub");
+    if (!waterEl || !waterMainEl || !pestValEl || !pestSubEl) return;
 
-    const unitEl = document.querySelector('input[name="unit-type"]:checked');
-    const unit = unitEl ? unitEl.value : "L";
-    const waterVal = parseFloat(waterEl.value) || 0;
-    const ratio = parseFloat(dilutionEl.value) || 0;
+    const waterL = Math.max(0, parseFloat(waterEl.value) || 0);
+    const waterMl = waterL * 1000.0;
 
-    const waterMl = unit === "L" ? waterVal * 1000.0 : waterVal * 20.0 * 1000.0;
-    const totalL = waterMl / 1000.0;
-    const totalMal = totalL / 20.0;
-    const pesticideMl = ratio > 0 ? waterMl / ratio : 0;
+    waterMainEl.textContent = `${waterL.toLocaleString(undefined, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })} L`;
 
-    document.getElementById("calc-water-main").textContent = `${totalL.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
-    document.getElementById("calc-water-sub").textContent = `${totalMal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 말`;
-    document.getElementById("calc-pesticide-val").textContent = `${pesticideMl.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mL (또는 g)`;
-    document.getElementById("calc-pesticide-sub").textContent =
-      ratio > 0 ? `${ratio.toLocaleString()}배 희석 기준` : "희석배수를 입력하세요";
+    const row = state.calcSelectedRow;
+    if (!row) {
+      pestValEl.textContent = "-";
+      pestSubEl.textContent = "농약을 먼저 선택하세요";
+      return;
+    }
+
+    const rangeInfo = getRangeInfo(row);
+    if (rangeInfo.ratios.length === 0) {
+      pestValEl.textContent = "희석 불필요";
+      pestSubEl.textContent = `기준 사용량(${row["사용량"]}) 참고`;
+      return;
+    }
+
+    if (rangeInfo.isRange) {
+      const typedVal = dilutionEl ? parseFloat(dilutionEl.value) : NaN;
+      if (
+        isNaN(typedVal) ||
+        typedVal < rangeInfo.min ||
+        typedVal > rangeInfo.max
+      ) {
+        pestValEl.textContent = "-";
+        pestSubEl.textContent = `허용 범위(${rangeInfo.min.toLocaleString()}~${rangeInfo.max.toLocaleString()}배) 내 값을 입력하세요`;
+        if (rangeHint) {
+          rangeHint.style.display = "block";
+          rangeHint.className = "dilution-range-hint error";
+          rangeHint.textContent = `⚠️ 등록 범위(${rangeInfo.min.toLocaleString()} ~ ${rangeInfo.max.toLocaleString()}배) 내의 숫자만 입력 가능합니다.`;
+        }
+        return;
+      }
+
+      if (rangeHint) {
+        rangeHint.style.display = "block";
+        rangeHint.className = "dilution-range-hint";
+        rangeHint.textContent = `입력 가능 범위: ${rangeInfo.min.toLocaleString()} ~ ${rangeInfo.max.toLocaleString()}배`;
+      }
+
+      const pesticideMl = waterMl / typedVal;
+      pestValEl.textContent = `${pesticideMl.toLocaleString(undefined, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })} mL (또는 g)`;
+      pestSubEl.textContent = `${typedVal.toLocaleString()}배 적용 기준 (등록: ${row["희석배수"]})`;
+    } else {
+      const pesticideMl = waterMl / rangeInfo.min;
+      pestValEl.textContent = `${pesticideMl.toLocaleString(undefined, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })} mL (또는 g)`;
+      pestSubEl.textContent = `${row["희석배수"]} 고정 기준`;
+    }
   }
 
   async function loadDataOnce() {
@@ -692,6 +846,7 @@
 
       allData = loaded;
       applyFilters();
+      updateCalcMatchHint();
     } catch (e) {
       fetchErrorMsg = e.message || "데이터 로딩 실패";
       const totalEl = document.getElementById("metric-total");
@@ -778,29 +933,87 @@
       }
     );
 
-    // 2) 계산기 탭 적용작물 & 농약 검색 바인딩
+    // 2) 계산기 탭: '농약 검색'과 동일 순서(1. 용도 → 2. 작물 → 3. 병해충 → 4. 농약 선택)
+    function validateCalcSelectionAfterFilterChange() {
+      updateCalcMatchHint();
+      if (!state.calcSelectedRow) return;
+      const r = state.calcSelectedRow;
+      const stillMatches =
+        (state.calcUse === "전체" || r["용도"] === state.calcUse) &&
+        (state.calcCrop === "전체" || r["작물명"] === state.calcCrop) &&
+        (state.calcPest === "전체" || r["적용병해충"] === state.calcPest);
+      if (!stillMatches) {
+        clearCalcSelectedPesticide();
+      }
+    }
+
+    bindSearchableSelect(
+      "calc-use",
+      () => getUniqueOptions(allData, "용도"),
+      (val) => {
+        const step1 = val === "전체" ? allData : allData.filter((r) => r["용도"] === val);
+        const validCrops = getUniqueOptions(step1, "작물명");
+        if (state.calcCrop !== "전체" && !validCrops.includes(state.calcCrop)) {
+          state.calcCrop = "전체";
+          const cropInput = document.getElementById("calc-crop-input");
+          const cropClear = document.getElementById("calc-crop-clear");
+          if (cropInput) cropInput.value = "";
+          if (cropClear) cropClear.style.display = "none";
+        }
+        const step2 = state.calcCrop === "전체" ? step1 : step1.filter((r) => r["작물명"] === state.calcCrop);
+        const validPests = getUniqueOptions(step2, "적용병해충");
+        if (state.calcPest !== "전체" && !validPests.includes(state.calcPest)) {
+          state.calcPest = "전체";
+          const pestInput = document.getElementById("calc-pest-input");
+          const pestClear = document.getElementById("calc-pest-clear");
+          if (pestInput) pestInput.value = "";
+          if (pestClear) pestClear.style.display = "none";
+        }
+        validateCalcSelectionAfterFilterChange();
+      }
+    );
+
     bindSearchableSelect(
       "calc-crop",
-      () => getUniqueOptions(allData, "작물명"),
+      () => {
+        const step1 = state.calcUse === "전체" ? allData : allData.filter((r) => r["용도"] === state.calcUse);
+        return getUniqueOptions(step1, "작물명");
+      },
       (val) => {
-        if (
-          state.calcSelectedRow &&
-          val !== "전체" &&
-          state.calcSelectedRow["작물명"] !== val
-        ) {
-          state.calcSelectedRow = null;
-          state.calcPesticideLabel = "";
-          const pInput = document.getElementById("calc-pesticide-input");
-          const pClear = document.getElementById("calc-pesticide-clear");
-          if (pInput) pInput.value = "";
-          if (pClear) pClear.style.display = "none";
-          renderCalcSelectedInfo();
+        const step1 = state.calcUse === "전체" ? allData : allData.filter((r) => r["용도"] === state.calcUse);
+        const step2 = val === "전체" ? step1 : step1.filter((r) => r["작물명"] === val);
+        const validPests = getUniqueOptions(step2, "적용병해충");
+        if (state.calcPest !== "전체" && !validPests.includes(state.calcPest)) {
+          state.calcPest = "전체";
+          const pestInput = document.getElementById("calc-pest-input");
+          const pestClear = document.getElementById("calc-pest-clear");
+          if (pestInput) pestInput.value = "";
+          if (pestClear) pestClear.style.display = "none";
         }
+        validateCalcSelectionAfterFilterChange();
+      }
+    );
+
+    bindSearchableSelect(
+      "calc-pest",
+      () => {
+        const step1 = state.calcUse === "전체" ? allData : allData.filter((r) => r["용도"] === state.calcUse);
+        const step2 = state.calcCrop === "전체" ? step1 : step1.filter((r) => r["작물명"] === state.calcCrop);
+        return getUniqueOptions(step2, "적용병해충");
+      },
+      () => {
+        validateCalcSelectionAfterFilterChange();
       }
     );
 
     bindCalcPesticideSelect();
-    renderCalcSelectedInfo();
+    updateCalcMatchHint();
+    if (state.calcSelectedRow) {
+      applySelectedPesticideToCalc(state.calcSelectedRow, true);
+    } else {
+      syncDilutionInputLockState(false);
+      renderCalcSelectedInfo();
+    }
 
     // 모달 닫기 이벤트
     const modalOverlay = document.getElementById("detail-modal-overlay");
@@ -884,11 +1097,14 @@
     const calcResetBtn = document.getElementById("calc-reset-btn");
     if (calcResetBtn) {
       calcResetBtn.addEventListener("click", () => {
+        state.calcUse = "전체";
         state.calcCrop = "전체";
+        state.calcPest = "전체";
         state.calcPesticideLabel = "";
         state.calcSelectedRow = null;
+        state.calcCustomRatio = "";
 
-        ["calc-crop", "calc-pesticide"].forEach((p) => {
+        ["calc-use", "calc-crop", "calc-pest", "calc-pesticide"].forEach((p) => {
           const inp = document.getElementById(`${p}-input`);
           const clr = document.getElementById(`${p}-clear`);
           const dd = document.getElementById(`${p}-dropdown`);
@@ -897,15 +1113,11 @@
           if (dd) dd.style.display = "none";
         });
 
-        const radioL = document.getElementById("unit-radio-l");
-        const label = document.getElementById("water-input-label");
         const waterInput = document.getElementById("water-input");
-        const dilutionInput = document.getElementById("dilution-input");
-        if (radioL) radioL.checked = true;
-        if (label) label.textContent = "4단계. 살포할 물의 양 (L)";
         if (waterInput) waterInput.value = "20";
-        if (dilutionInput) dilutionInput.value = "1000";
 
+        syncDilutionInputLockState(false);
+        updateCalcMatchHint();
         renderCalcSelectedInfo();
         updateCalculator();
       });
@@ -913,34 +1125,33 @@
 
     document.getElementById("download-csv-btn").addEventListener("click", downloadCsv);
 
-    // 희석배수 계산기 입력 이벤트
-    document.querySelectorAll('input[name="unit-type"]').forEach((radio) => {
-      radio.addEventListener("change", (e) => {
-        const label = document.getElementById("water-input-label");
-        const input = document.getElementById("water-input");
-        if (e.target.value === "L") {
-          label.textContent = "4단계. 살포할 물의 양 (L)";
-          input.value = "20";
-        } else {
-          label.textContent = "4단계. 살포할 물의 양 (말)";
-          input.value = "1";
-        }
-        updateCalculator();
-      });
-    });
-
+    // 살포할 물의 양(L) 및 범위 희석배수 직접 입력 이벤트
     const waterInput = document.getElementById("water-input");
     const dilutionInput = document.getElementById("dilution-input");
+
     waterInput.addEventListener("input", updateCalculator);
     waterInput.addEventListener("change", updateCalculator);
-    dilutionInput.addEventListener("input", updateCalculator);
-    dilutionInput.addEventListener("change", updateCalculator);
 
-    document.querySelectorAll(".preset-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        dilutionInput.value = btn.dataset.ratio;
-        updateCalculator();
-      });
+    dilutionInput.addEventListener("input", () => {
+      if (dilutionInput.readOnly) return;
+      state.calcCustomRatio = dilutionInput.value;
+      updateCalculator();
+    });
+
+    dilutionInput.addEventListener("blur", () => {
+      if (dilutionInput.readOnly || !state.calcSelectedRow) return;
+      const rangeInfo = getRangeInfo(state.calcSelectedRow);
+      if (!rangeInfo.isRange) return;
+
+      let val = parseFloat(dilutionInput.value);
+      if (isNaN(val) || val < rangeInfo.min) {
+        val = rangeInfo.min;
+      } else if (val > rangeInfo.max) {
+        val = rangeInfo.max;
+      }
+      state.calcCustomRatio = String(val);
+      dilutionInput.value = state.calcCustomRatio;
+      updateCalculator();
     });
 
     updateCalculator();
@@ -948,6 +1159,7 @@
     // 이미 데이터가 로드된 상태(React 재렌더링 직후)라면 즉시 화면 갱신
     if (allData.length > 0) {
       applyFilters();
+      updateCalcMatchHint();
     } else if (fetchErrorMsg) {
       document.getElementById("metric-total").textContent = "오류";
     } else {
