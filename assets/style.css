@@ -151,6 +151,34 @@ body, .page-bg {
   margin-top: 10px;
 }
 
+.keyword-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.keyword-input-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-submit-btn {
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  background-color: #1b4332;
+  border: none;
+  border-radius: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.search-submit-btn:active {
+  background-color: #143326;
+}
+
 .field-label {
   display: block;
   font-size: 12.5px;
@@ -167,6 +195,121 @@ body, .page-bg {
   border-radius: 8px;
   background-color: #ffffff;
   color: #0f172a;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #2d6a4f;
+  box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.15);
+}
+
+/* 목록 선택 + 검색어 자동완성 콤보박스 */
+.combo-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.combo-input {
+  padding-right: 64px;
+}
+
+.combo-clear-btn {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  color: #475569;
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.combo-toggle-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 32px;
+  border: none;
+  border-left: 1px solid #e2e8f0;
+  background: transparent;
+  color: #475569;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.combo-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background-color: #ffffff;
+  border: 1.5px solid #2d6a4f;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+  z-index: 999;
+}
+
+.combo-header {
+  position: sticky;
+  top: 0;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1b4332;
+  background-color: #f0fdf4;
+  border-bottom: 1px solid #dcfce7;
+}
+
+.combo-option {
+  padding: 10px 12px;
+  font-size: 15px;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+}
+
+.combo-option:last-child {
+  border-bottom: none;
+}
+
+.combo-option:hover,
+.combo-option.selected {
+  background-color: #ecfdf5;
+  color: #1b4332;
+  font-weight: 700;
+}
+
+.combo-highlight {
+  color: #15803d;
+  font-weight: 800;
+  background-color: #dcfce7;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.combo-empty {
+  padding: 14px;
+  font-size: 13.5px;
+  color: #94a3b8;
+  text-align: center;
 }
 
 /* 2. 모바일 가로 1줄 요약지표 */
